@@ -14,6 +14,6 @@ def read_txt(intput_path,output_path):
                 file.write(data)
 
 if __name__=="__main__":
-    intput_path="./dump3.txt"
-    output_path="./split3.txt"
+    intput_path="./model/dump3.txt"
+    output_path="./model/split3.txt"
     read_txt(intput_path,output_path)

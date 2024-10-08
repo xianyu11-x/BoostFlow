@@ -3,6 +3,7 @@ class featureManagemnet:
         self.bitsLen = bitsLen
         self.IndexReg = [0]*(1<<bitsLen)
         self.countReg = [0]*(1<<bitsLen)
+        self.timestampReg = [0]*(1<<bitsLen)
         self.featureDict = {}
         for i in range(featureNum):
             self.featureDict[i] = [0]*(1<<bitsLen)
