@@ -85,5 +85,5 @@ plt.show()
 plt.savefig('./fig.png')
 
 # #bst.save_model('model1.json')
-bst.dump_model('./encode_xgboost/dump2.txt')
+bst.dump_model('./encode/dump2.txt')
 # #pickle.dump(bst, open("xgb_model_1", 'wb'))
