@@ -11,7 +11,7 @@ class TreeModel:
     def load_model(self, model_path):
         if self.model_type == 'xgboost':
             self.model = xgb.Booster()
-            self.model.load_model(model_path,format='text')
+            self.model.load_model(model_path)
         else:
             self.model = None
             

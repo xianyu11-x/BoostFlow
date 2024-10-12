@@ -67,6 +67,7 @@ class featureManagemnet:
         self.featureDict = {}
         self.maxPktCount = maxPktCount
         self.featureMethodDict = featureMethodDict
+        self.totalReg = 1<<bitsLen
         for feature in featureLists:
             self.featureDict[feature] = [0]*(1<<bitsLen)
     
@@ -90,7 +91,7 @@ class featureManagemnet:
                 self.timestampReg[reg_id] = pktInfo.timestamp
                 # for i in range(len(self.featureDict)):
                 #     self.featureDict[i][reg_id] += pktInfo.pktLen
-            elif self.countReg[reg_id] == self.maxPktCount:
+            elif self.countReg[reg_id] >= self.maxPktCount:
                 update_flag  = True
                 self.clearReg(reg_id)
                 self.IndexReg[reg_id] = flow_id
@@ -140,3 +141,10 @@ class featureManagemnet:
         for name,feature in self.featureDict.items():
             pktFeature[name] = feature[reg_id]
         return pktFeature 
+
+    def getUsedRegNum(self):
+        usedRegNum = 0
+        for i in range(self.totalReg):
+            if self.IndexReg[i] != 0 and self.countReg[i] < self.maxPktCount:
+                usedRegNum += 1
+        return usedRegNum

@@ -15,26 +15,32 @@ class switch:
         self.trees = treemodel.TreeModel('xgboost',modelPath)
         
     def process(self,pkt:feature.packetInfo):
-        if [pkt.srcIP,pkt.dstIP,pkt.srcPort,pkt.dstPort,pkt.protocol] in self.filter:
-            self.filter[[pkt.srcIP,pkt.dstIP,pkt.srcPort,pkt.dstPort,pkt.protocol]]['count'] += 1
+        flow_id = str(pkt.srcIP) + '_' + str(pkt.srcPort) + '_' + str(pkt.dstIP) + '_' + str(pkt.dstPort) + '_' + str(pkt.protocol)
+        if flow_id in self.filter:
+            self.filter[flow_id]['count'] += 1
+            self.totalNum += 1
             return -2
         flag,flowID,regID = self.featureManager.update(pkt)
+        #print(flowID,regID)
         if flag == False:
             self.collsionNum += 1
+            self.totalNum += 1
             return -1
         else :
             if self.featureManager.getCount(regID) == self.featureManager.maxPktCount:
-                filter.add(pkt)
                 featureDict = self.featureManager.getFeature(regID)
                 features = []
                 for featureName in self.featureList:
                     features.append(featureDict[featureName])
                 ypred = self.trees.predict(features)
-                self.filter[[pkt.srcIP,pkt.dstIP,pkt.srcPort,pkt.dstPort,pkt.protocol]]['count'] = 0
-                self.filter[[pkt.srcIP,pkt.dstIP,pkt.srcPort,pkt.dstPort,pkt.protocol]]['flag'] = ypred
+                self.filter[flow_id] = {}
+                self.filter[flow_id]['count'] = 0
+                self.filter[flow_id]['flag'] = ypred
         self.totalNum += 1     
         return 0
 
+    def getCollsionInfo(self):
+        return self.collsionNum,self.totalNum
 
 if __name__ == "__main__":
     allMethods = feature.featureMethods()

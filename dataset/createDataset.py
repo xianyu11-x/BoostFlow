@@ -1,5 +1,5 @@
 import scapy.all as scapy
-
+import pandas as pd
 #读取pcap文件，并按源IP、源端口、目的IP、目的端口和协议作为流标识，将流中的数据包按时间顺序存储在字典中
 def read_pcap(pcap_file) -> dict:
     flow = {}
@@ -64,6 +64,41 @@ def save_feature(feature, csv_file,featureIndexList=['Total Length of Fwd Packet
         f.write(','.join(featureIndexList) + ',Label\n')
         for key in feature.keys():
             f.write(','.join([str(x) for x in feature[key]]) + ',1\n')
+
+#删除csv文件中 Flow IAT Max为0的行
+def cleanFlow(csvPath):
+    df = pd.read_csv(csvPath)
+    df = df[df[' Flow IAT Max'] != 0]
+    #把df中 Flow Duration、 Flow IAT Min、 Flow IAT Max列的值先乘以1000000000后右移16位转换为整数
+    df[' Flow Duration'] = df[' Flow Duration'].apply(lambda x: int(x*1000000000/65536))
+    df[' Flow IAT Min'] = df[' Flow IAT Min'].apply(lambda x: int(x*1000000000/65536))
+    df[' Flow IAT Max'] = df[' Flow IAT Max'].apply(lambda x: int(x*1000000000/65536))
+    #把df中 Flow Duration、 Flow IAT Min、 Flow IAT Max列中大于1048575的值转换位1048575
+    df[' Flow Duration'] = df[' Flow Duration'].apply(lambda x: 1048575 if x > 1048575 else x)
+    df[' Flow IAT Min'] = df[' Flow IAT Min'].apply(lambda x: 1048575 if x > 1048575 else x)
+    df[' Flow IAT Max'] = df[' Flow IAT Max'].apply(lambda x: 1048575 if x > 1048575 else x)
+    df.to_csv(csvPath, index=False)
+    
+
+def setLabel(unLabeledCsvPath):
+    df1=pd.read_csv(unLabeledCsvPath)
+    df1['Label']=df1['Label'].apply(lambda x: 0)
+    # df2=pd.read_csv(LabeledcsvPath)
+    # df2=df2[['Flow ID',' Source IP',' Source Port',' Destination IP',' Destination Port',' Protocol',' Label']]
+    # classes=['BENIGN','DDoS','DoS Hulk','DoS Slowhttptest','DoS GoldenEye','DoS slowloris','PortScan','Bot','Infiltration','Web_Attack_Brute_Force','Web_Attack_XSS','Web_Attack_Sql_Injection','Heartbleed','FTP-Patator','SSH-Patator']
+    # valueList=[0,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    # df2 = df2.replace(classes,valueList)
+    #将df2中的目的IP、源IP、目的端口、源端口、协议拼接成Flow ID
+    #df2['Flow ID'] = df2.apply(lambda x:  x[' Destination IP'] + '-' + x[' Source IP'] + '-' + str(x[' Destination Port']) + '-' + str(x[' Source Port']) + '-' + str(x[' Protocol']), axis=1)
+    #遍历df1中的Flow ID，如果在df2中存在，则将df2中对应的Label值赋给df1中的Label列
+    for i in range(len(df1)):
+        flowIdList=df1.loc[i]['FlowId'].split('-')
+        dstIp=flowIdList[0]
+        srcIp=flowIdList[1]
+        if dstIp=='172.16.0.1' or srcIp=='172.16.0.1':
+        #修改df1中该行对应Label列的值
+            df1.loc[i,('Label')]=1
+    df1.to_csv(unLabeledCsvPath, index=False)
 
 
 if __name__ == '__main__':
