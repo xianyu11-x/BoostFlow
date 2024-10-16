@@ -4,7 +4,7 @@ import encode as parser
 import numpy as np
 import copy
 import re
-# import signal
+import signal
 #import dbClient as dbc
 import ipaddress
 
@@ -68,7 +68,7 @@ def addClassifyTableEntries(target,classify_table,mergeTableEntriesList):
                                 )
 
 def addAllTableEntry():
-    if bfrt_info.p4_name!='p4_flowManagement_3':
+    if bfrt_info.p4_name!='BoostFlow':
         print("error p4 program")
     else:
         print("connect")
@@ -122,7 +122,7 @@ def addAllTableEntry():
 
 
 def delAllTableEntry():
-    if bfrt_info.p4_name!='p4_flowManagement_2':
+    if bfrt_info.p4_name!='BoostFlow':
         print("error p4 program")
     else:
         print("connect")
@@ -161,7 +161,7 @@ def delAllTableEntry():
 
 
 def getInfo():
-    if bfrt_info.p4_name!='p4_flowManagement_2':
+    if bfrt_info.p4_name!='BoostFlow':
         print("error p4 program")
     else:
         print("connect")
@@ -189,7 +189,7 @@ def getInfo():
                 print(data)
             
 def setcheckNewFlowTable():
-    if bfrt_info.p4_name!='p4_flowManagement_2':
+    if bfrt_info.p4_name!='BoostFlow':
         print("error p4 program")
     else:
         print("connect")
@@ -206,11 +206,24 @@ def addTableEntryToFlowFilter(data_dict):
         data = checkNewFlowTable.make_data([gc.DataTuple('flag',data_dict['final_res'])],"SwitchIngress.setClassifiedFlag")
         checkNewFlowTable.entry_add(target,[key],[data])
    
+   
+def readRegister(regLists:list):
+    target = gc.Target(device_id=0, pipe_id=0xffff)
+    regDict = {}
+    for regName in regLists:
+        regTable = bfrt_info.table_get("SwitchIngress."+regName)
+        regDict[regName] = {}
+        resp = regTable.entry_get(target,flags={"from_hw":True})
+        for data, key in resp:
+            pass
+            
+       
+   
 
 def receive_digest():
     print("receive_digest......")
-    # signal.signal(signal.SIGINT, quit)                                
-    # signal.signal(signal.SIGTERM, quit)
+    signal.signal(signal.SIGINT, quit)                                
+    signal.signal(signal.SIGTERM, quit)
     while True:
         digest = None
         try:
@@ -244,11 +257,6 @@ if __name__ == '__main__':
     bfrt_info=grpc_client.bfrt_info_get(p4_name=None)
     grpc_client.bind_pipeline_config(p4_name=bfrt_info.p4_name)
     learn_filter = bfrt_info.learn_get("digest_a")
-    # url = "http://218.199.84.19:8088"
-    # token = "B1gnlW_Qhet5JNdijU1N3cGmxDlCzNQNKZkhKPIyqajXV5QBWOP8LkPWARc-20V0VR-yK6rtlwcQC064O7Pofw=="  # 对于InfluxDB 1.8，token通常是 username:password
-    # org = "my-org"  # 对于InfluxDB 1.8，组织可以使用任意值，但通常使用 "-"
-    # bucket = "classdb"
-    # db = dbc.dbClient(url,token,org,bucket)
     if len(sys.argv) != 2:
         print('error')
     elif sys.argv[1] == 'add':

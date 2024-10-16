@@ -71,10 +71,24 @@ class featureManagemnet:
         for feature in featureLists:
             self.featureDict[feature] = [0]*(1<<bitsLen)
     
+    
+    def calFlowID(self,pktInfo):
+        flowID = self.CRC32([pktInfo.srcIP,pktInfo.dstIP,pktInfo.srcPort,pktInfo.dstPort,pktInfo.protocol])
+        if self.bitsLen <= 16:
+            tmpID = self.CRC16([pktInfo.srcIP,pktInfo.dstIP,pktInfo.srcPort,pktInfo.dstPort,pktInfo.protocol])
+            regID = tmpID & ((1<<self.bitsLen)-1)
+            return flowID,regID
+        elif self.bitsLen <= 32:
+            regID = flowID & ((1<<self.bitsLen)-1)
+            return flowID,regID
+        else :
+            return -1,-1
+    
     def update(self,pktInfo=packetInfo()):
         update_flag = False
-        flow_id = self.CRC32([pktInfo.srcIP,pktInfo.dstIP,pktInfo.srcPort,pktInfo.dstPort,pktInfo.protocol])
-        reg_id = self.CRC16([pktInfo.srcIP,pktInfo.dstIP,pktInfo.srcPort,pktInfo.dstPort,pktInfo.protocol])
+        # flow_id = self.CRC32([pktInfo.srcIP,pktInfo.dstIP,pktInfo.srcPort,pktInfo.dstPort,pktInfo.protocol])
+        # reg_id = self.CRC16([pktInfo.srcIP,pktInfo.dstIP,pktInfo.srcPort,pktInfo.dstPort,pktInfo.protocol])
+        flow_id,reg_id = self.calFlowID(pktInfo)
         if self.IndexReg[reg_id] == 0:
             update_flag = True
             self.IndexReg[reg_id] = flow_id
