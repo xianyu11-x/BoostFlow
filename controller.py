@@ -1,10 +1,12 @@
 import bfrt_grpc.client as gc
 import sys
-import encode as parser
+import encode.parser_tree as parser
 import numpy as np
 import copy
 import re
 import signal
+import threading
+import time
 #import dbClient as dbc
 import ipaddress
 
@@ -68,14 +70,14 @@ def addClassifyTableEntries(target,classify_table,mergeTableEntriesList):
                                 )
 
 def addAllTableEntry():
-    if bfrt_info.p4_name!='BoostFlow':
+    if bfrt_info.p4_name!=curP4Name:
         print("error p4 program")
     else:
         print("connect")
         ingress_port=0
         sid=5
         egress_port=5
-        featureTableEntriesDict,treeTableEntriesDict,mergeTableEntriesList=preLoadEntries('./encode/split3.txt')
+        featureTableEntriesDict,treeTableEntriesDict,mergeTableEntriesList=preLoadEntries('./encode/model/split3.txt')
         feature0_table=bfrt_info.table_get("SwitchIngress.table_feature0")
         feature1_table=bfrt_info.table_get("SwitchIngress.table_feature1")
         feature2_table=bfrt_info.table_get("SwitchIngress.table_feature2")
@@ -122,7 +124,7 @@ def addAllTableEntry():
 
 
 def delAllTableEntry():
-    if bfrt_info.p4_name!='BoostFlow':
+    if bfrt_info.p4_name!=curP4Name:
         print("error p4 program")
     else:
         print("connect")
@@ -161,7 +163,7 @@ def delAllTableEntry():
 
 
 def getInfo():
-    if bfrt_info.p4_name!='BoostFlow':
+    if bfrt_info.p4_name!=curP4Name:
         print("error p4 program")
     else:
         print("connect")
@@ -189,7 +191,7 @@ def getInfo():
                 print(data)
             
 def setcheckNewFlowTable():
-    if bfrt_info.p4_name!='BoostFlow':
+    if bfrt_info.p4_name!=curP4Name:
         print("error p4 program")
     else:
         print("connect")
@@ -211,12 +213,23 @@ def readRegister(regLists:list):
     target = gc.Target(device_id=0, pipe_id=0xffff)
     regDict = {}
     for regName in regLists:
+        startTime = time.time()
+        print(f"start read time: {startTime} ")
         regTable = bfrt_info.table_get("SwitchIngress."+regName)
         regDict[regName] = {}
+        # for i in range(65536):
+        #     resp=regTable.entry_get(target,[regTable.make_key([gc.KeyTuple('$REGISTER_INDEX', i)])],flags={"from_hw":True})
+        #     data,_ = next(resp)
+        #     regDict[regName][i] = data.to_dict()["SwitchIngress."+regName+'.f1'][1]
         resp = regTable.entry_get(target,flags={"from_hw":True})
+        i = 0
         for data, key in resp:
-            pass
-            
+            regDict[regName][i] = data.to_dict()["SwitchIngress."+regName+'.f1']
+            i = i+1
+        endTime = time.time()
+        print(f"end read time: {endTime} ")
+        print(f"read time: {endTime-startTime} ")
+    return regDict
        
    
 
@@ -224,6 +237,7 @@ def receive_digest():
     print("receive_digest......")
     signal.signal(signal.SIGINT, quit)                                
     signal.signal(signal.SIGTERM, quit)
+
     while True:
         digest = None
         try:
@@ -251,12 +265,41 @@ def receive_digest():
                 except Exception as e:
                     print('Unexpected error adding table entry - [%s]', e)    
 
+def delOldFlowTableEntry(countRegSnapShot,flowIDRegSnapShot):
+    print("tick....")
+    regDict = readRegister(['reg_pkt_count','reg_flow_ID'])
+    size = len(regDict['reg_pkt_count'])
+    for i in range(size):
+        if regDict['reg_pkt_count'][i] == countRegSnapShot[i] and regDict['reg_flow_ID'][i] == flowIDRegSnapShot[i]:
+            regCountTable = bfrt_info.table_get("SwitchIngress.reg_pkt_count")
+            regFlowIDTable = bfrt_info.table_get("SwitchIngress.reg_flow_ID")
+            target = gc.Target(device_id=0, pipe_id=0xffff)
+            regCountTable.entry_add(target,[regCountTable.make_key([gc.KeyTuple('$REGISTER_INDEX', i)])],[regCountTable.make_data([gc.DataTuple('f1',0)])])
+            regFlowIDTable.entry_add(target,[regFlowIDTable.make_key([gc.KeyTuple('$REGISTER_INDEX', i)])],[regFlowIDTable.make_data([gc.DataTuple('f1',0)])])
+    countRegSnapShot = regDict['reg_pkt_count']
+    flowIDRegSnapShot = regDict['reg_flow_ID']        
+    threading.Timer(30, delOldFlowTableEntry, [countRegSnapShot,flowIDRegSnapShot]).start()
+
+def test():
+    regCountTable = bfrt_info.table_get("SwitchIngress.reg_pkt_count")
+    regFlowIDTable = bfrt_info.table_get("SwitchIngress.reg_flow_ID")
+    target = gc.Target(device_id=0, pipe_id=0xffff)
+    regCountTable.entry_add(target,[regCountTable.make_key([gc.KeyTuple('$REGISTER_INDEX', 1)])],[regCountTable.make_data([gc.DataTuple('f1',10)])])
+    regFlowIDTable.entry_add(target,[regFlowIDTable.make_key([gc.KeyTuple('$REGISTER_INDEX', 1)])],[regFlowIDTable.make_data([gc.DataTuple('f1',10)])])
 
 if __name__ == '__main__':
-    grpc_client=gc.ClientInterface(grpc_addr="172.23.20.70:50052",client_id=0,device_id=0)
+    curP4Name = 'p4_flowManagement_2'
+    switchIP = "172.23.20.70"
+    port = "50052"
+    grpc_client=gc.ClientInterface(grpc_addr=switchIP+":"+port,client_id=0,device_id=0)
     bfrt_info=grpc_client.bfrt_info_get(p4_name=None)
     grpc_client.bind_pipeline_config(p4_name=bfrt_info.p4_name)
     learn_filter = bfrt_info.learn_get("digest_a")
+    countRegSnapShot = {}
+    flowIDRegSnapShot = {}
+    for i in range(65536):
+        countRegSnapShot[i] = 0
+        flowIDRegSnapShot[i] = 0
     if len(sys.argv) != 2:
         print('error')
     elif sys.argv[1] == 'add':
@@ -274,7 +317,11 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'reset':
         print('reset')
         reset()
+    elif sys.argv[1] == 'test':
+        print('test')
+        test()
     else : 
         print('error')
     #接受digest数据包
+    delOldFlowTableEntry(countRegSnapShot,flowIDRegSnapShot)
     receive_digest() 

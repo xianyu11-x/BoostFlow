@@ -8,7 +8,7 @@ if __name__ == '__main__':
     featureList = ['totalLength','flowDuration','maxPktLength','dstPort','minPktLength','minPktInterval','maxPktInterval']
     modelPath = '/home/monitor/p4app/BoostFlow/encode/model/model1.json' 
     pcapPath = '/home/monitor/p4app/BoostFlow/dataset/Friday-Afternoon.pcap'
-    for i in range(8,21,4):
+    for i in range(18,21,4):
         s = switch.switch(modelPath,featureList,i)
         countRegSnapshot = s.featureManager.countReg.copy()
         flowIDRegSnapshot = s.featureManager.IndexReg.copy()

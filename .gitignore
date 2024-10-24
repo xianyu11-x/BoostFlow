@@ -3,3 +3,8 @@
 **/model/
 **.pcap
 **.csv
+BoostFlow/
+CMakeFiles/
+**.txt
+Makefile
+**.cmake
