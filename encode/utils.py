@@ -1,3 +1,4 @@
+import numpy as np
 
 def findNextSplit(minv,maxv):
     count=0
