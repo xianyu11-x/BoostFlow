@@ -19,13 +19,14 @@ class switch:
         if flow_id in self.filter:
             self.filter[flow_id]['count'] += 1
             self.totalNum += 1
-            return -2
+            return -2,self.filter[flow_id]['flag']
         flag,flowID,regID = self.featureManager.update(pkt)
         #print(flowID,regID)
+        ypred = -1
         if flag == False:
             self.collsionNum += 1
             self.totalNum += 1
-            return -1
+            return -1,-1
         else :
             if self.featureManager.getCount(regID) == self.featureManager.maxPktCount:
                 featureDict = self.featureManager.getFeature(regID)
@@ -37,7 +38,7 @@ class switch:
                 self.filter[flow_id]['count'] = 0
                 self.filter[flow_id]['flag'] = ypred
         self.totalNum += 1     
-        return 0
+        return 0,ypred
 
     def getCollsionInfo(self):
         return self.collsionNum,self.totalNum
