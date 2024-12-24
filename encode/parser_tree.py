@@ -1,8 +1,8 @@
 import re
 import copy
 import numpy as np
-import encode.utils as utils
-#import utils
+#import encode.utils as utils
+import utils
 import json
 
 def parse_tree(lines):
@@ -104,11 +104,23 @@ def encode_feature(feature_dict,tree_feature_dict):
     return encode_feature_dict
 
 
+def sortTreesLeaf(trees):
+    leafValueDict={}
+    for tree_id,tree in trees.items():
+        leafList=[]
+        for node_id,node_dict in tree.items():
+            if "leaf" in node_dict:
+                leafList.append(node_dict['leaf'])
+        leafList.sort()
+        leafValueDict[tree_id] = leafList
+    return leafValueDict
+
 
 #深度优先遍历树节点，获取从根节点到叶子节点的所有路径
-def dfs_tree(tree,node_id,tree_feature_dict,node_path):
+def dfs_tree(tree_id,tree,node_id,tree_feature_dict,node_path):
     global all_node_path
     global leaf_index
+    global leafValueDict
     if len(tree[node_id])>1:
         node=tree[node_id]['feature'].split('<')
         left=tree[node_id]['true_branch']
@@ -118,18 +130,18 @@ def dfs_tree(tree,node_id,tree_feature_dict,node_path):
         tempr=node_path[node[0]]['right']
         node_path[node[0]]['right']=index
         left_path=copy.deepcopy(node_path)
-        dfs_tree(tree,left,tree_feature_dict,left_path)
+        dfs_tree(tree_id,tree,left,tree_feature_dict,left_path)
         node_path[node[0]]['right']=tempr
         templ=node_path[node[0]]['left']
         node_path[node[0]]['left']=index+1
         right_path=copy.deepcopy(node_path)
-        dfs_tree(tree,right,tree_feature_dict,right_path)
+        dfs_tree(tree_id,tree,right,tree_feature_dict,right_path)
         node_path[node[0]]['left']=templ
     else :
         all_node_path[node_id]={}
         all_node_path[node_id]['leaf']=tree[node_id]['leaf']
-        all_node_path[node_id]['leaf_index']=leaf_index
-        leaf_index+=1
+        all_node_path[node_id]['leaf_index']=leafValueDict[tree_id].index(tree[node_id]['leaf'])
+        #leaf_index+=1
         all_node_path[node_id]['path']=copy.deepcopy(node_path)
         return
     return
@@ -147,7 +159,7 @@ def get_all_node_path_list(trees,feature_list,tree_feature_dict,encode_feature_d
         all_node_path={}
         global leaf_index
         leaf_index = 0
-        dfs_tree(tree,0,tree_feature_dict[tree_id],node_path)
+        dfs_tree(tree_id,tree,0,tree_feature_dict[tree_id],node_path)
         all_node_path_list.append(copy.deepcopy(all_node_path))
     return all_node_path_list
 
@@ -161,6 +173,7 @@ def leaf_to_complement(all_node_path_list):
             node_dict['leaf']=leaf
     return all_node_path_list
 
+#设置所有未使用的特征的范围区间为0
 def clean_unused_feature(all_node_path_list,encode_feature_dict):
     i=0
     for all_node_path in all_node_path_list:
@@ -172,8 +185,11 @@ def clean_unused_feature(all_node_path_list,encode_feature_dict):
         i=i+1
     return all_node_path_list
 
+
+#获取特征表的流表项
 def getFeatureTableEntries(feature_dict,encode_feature_dict,maxBitsDict):
     k=0
+    featureBit = 4
     featureTableEntriesDict={}
     for featureName,featureValueList in feature_dict.items():
         featureTableEntriesDict[featureName]=[]
@@ -185,7 +201,7 @@ def getFeatureTableEntries(feature_dict,encode_feature_dict,maxBitsDict):
             rows= encode_feature_dict[featureName].shape[0]
             encodeValue=int(0)
             for j in range(rows,0,-1):
-                encodeValue*=16 #每个特征值占用位数为4位
+                encodeValue*=1<<4 #每个特征值占用位数为4位
                 encodeValue += encode_feature_dict[featureName][j-1][i-1] 
             startNumList,addNumList = utils.rangeToTernary(0,featureValueList[i])
             for startNum,addNum in zip(startNumList,addNumList):
@@ -369,6 +385,9 @@ def get_para(lines,feature_list,maxBitsList):
     for featureName , maxBits in zip(feature_list,maxBitsList):
         maxBitsDict[featureName]=maxBits
     trees = parse_tree(lines)
+    global leafValueDict
+    leafValueDict = sortTreesLeaf(trees)
+    print(leafValueDict)
     feature_dict=split_all_feature(trees,feature_list)
     tree_feature_dict=split_tree_feature(trees,feature_list)
     encode_feature_dict=encode_feature(feature_dict,tree_feature_dict)
@@ -384,7 +403,7 @@ def get_para(lines,feature_list,maxBitsList):
     return featureTableEntriesDict,treeTableEntriesDict,mergeTableEntriesList
 
 if __name__ == "__main__":
-    with open('./split3.txt') as f: 
+    with open('./model/split3.txt') as f: 
         lines = f.readlines()
     feature_list=['feature0','feature1','feature2','feature3','feature4','feature5','feature6']
     maxBitsList=[16,20,16,16,16,20,20]
@@ -404,16 +423,16 @@ if __name__ == "__main__":
     print(len(mergeTableEntriesList))
     totalEntries+=len(mergeTableEntriesList)
     print(totalEntries)
-    # with open('featureTableEntriesDict.json', 'w') as f:
-    #     json.dump(featureTableEntriesDict, f)
+    with open('featureTableEntriesDict.json', 'w') as f:
+        json.dump(featureTableEntriesDict, f)
 
-    # # 将 treeTableEntries 的值写入文件
-    # with open('treeTableEntries.json', 'w') as f:
-    #     json.dump(treeTableEntries, f)
+    # 将 treeTableEntries 的值写入文件
+    with open('treeTableEntries.json', 'w') as f:
+        json.dump(treeTableEntries, f)
 
-    # # 将 mergeTableEntriesList 的值写入文件
-    # with open('mergeTableEntriesList.json', 'w') as f:
-    #     json.dump(mergeTableEntriesList, f)    
+    # 将 mergeTableEntriesList 的值写入文件
+    with open('mergeTableEntriesList.json', 'w') as f:
+        json.dump(mergeTableEntriesList, f)    
     # for entries in treeTableEntries[1]:
     #     if entries["value"] == 11:
     #         print(entries)

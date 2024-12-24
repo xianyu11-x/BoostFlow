@@ -32,8 +32,16 @@ header ethernet_h {
 }
 
 header recirc_h {
+    
     bit<8>       class_result;
     bit<16>      etherType;
+}
+
+header timestamp_h{
+    bit<8> marking;
+    bit<8> flow_type;
+    bit<48> ingress_timestamp;
+    bit<48> egress_timestamp;
 }
 
 header vlan_tag_h {
@@ -100,6 +108,12 @@ struct digest_a_t{
     bit<16> dst_port;
     bit<8> protocol;
     bit<8> final_res;
+    bit<32> flow_iat_max;
+    bit<32> flow_iat_min;
+    bit<32> flow_duration;
+    bit<16> pkt_len_max;
+    bit<16> pkt_len_min;
+    bit<16> pkt_len_total;
 } 
 
 
@@ -110,6 +124,8 @@ struct header_t {
     ipv4_h       ipv4;
     tcp_h        tcp;
     udp_h        udp;
+    payload_h      payload;
+    timestamp_h timestamp;
 }
 
 //#define feature_encode(name,tree) 
@@ -172,26 +188,10 @@ struct ig_metadata_t {
     bit<4> feature6encode2;
     bit<4> feature6encode3;
     bit<4> feature6encode4;
-    bit<4> feature0encode5;
-    bit<4> feature0encode6;
-    bit<4> feature1encode5;
-    bit<4> feature1encode6;
-    bit<4> feature2encode5;
-    bit<4> feature2encode6;
-    bit<4> feature3encode5;
-    bit<4> feature3encode6;
-    bit<4> feature4encode5;
-    bit<4> feature4encode6;
-    bit<4> feature5encode5;
-    bit<4> feature5encode6;
-    bit<4> feature6encode5;
-    bit<4> feature6encode6;
     bit<8> resTree1;
     bit<8> resTree2;
     bit<8> resTree3;
     bit<8> resTree4;
-    bit<8> resTree5;
-    bit<8> resTree6;
     bit<8> finres;
     bit<8> final_class;
 }
@@ -296,7 +296,10 @@ control SwitchIngress(
         inout ingress_intrinsic_metadata_for_tm_t ig_intr_tm_md) {  
     
     /************ ACTIONS ************/
-
+    
+    action drop() {
+        ig_intr_dprsr_md.drop_ctl = 1;
+    }
 
     /* Registers for flow management */
     Register<bit<8>,bit<(INDEX_WIDTH)>>(MAX_REGISTER_ENTRIES) reg_classified_flag;
@@ -543,61 +546,47 @@ control SwitchIngress(
     //#define tb_apply(name) name##_tb.apply();
 
 
-    action SetCode0(bit<32> allEncode) {
+    action SetCode0(bit<16> allEncode) {
         ig_md.feature0encode1=allEncode[3:0];
         ig_md.feature0encode2=allEncode[7:4];
         ig_md.feature0encode3=allEncode[11:8];
         ig_md.feature0encode4=allEncode[15:12];
-        ig_md.feature0encode5=allEncode[19:16];
-        ig_md.feature0encode6=allEncode[23:20];
     }
     action SetCode1(bit<32> allEncode) {
         ig_md.feature1encode1=allEncode[3:0];
         ig_md.feature1encode2=allEncode[7:4];
         ig_md.feature1encode3=allEncode[11:8];
         ig_md.feature1encode4=allEncode[15:12];
-        ig_md.feature1encode5=allEncode[19:16];
-        ig_md.feature1encode6=allEncode[23:20];
     }
     action SetCode2(bit<32> allEncode) {
         ig_md.feature2encode1=allEncode[3:0];
         ig_md.feature2encode2=allEncode[7:4];
         ig_md.feature2encode3=allEncode[11:8];
         ig_md.feature2encode4=allEncode[15:12];
-        ig_md.feature2encode5=allEncode[19:16];
-        ig_md.feature2encode6=allEncode[23:20];
     }
     action SetCode3(bit<32> allEncode) {
         ig_md.feature3encode1=allEncode[3:0];
         ig_md.feature3encode2=allEncode[7:4];
         ig_md.feature3encode3=allEncode[11:8];
         ig_md.feature3encode4=allEncode[15:12];
-        ig_md.feature3encode5=allEncode[19:16];
-        ig_md.feature3encode6=allEncode[23:20];
     }
     action SetCode4(bit<32> allEncode) {
         ig_md.feature4encode1=allEncode[3:0];
         ig_md.feature4encode2=allEncode[7:4];
         ig_md.feature4encode3=allEncode[11:8];
         ig_md.feature4encode4=allEncode[15:12];
-        ig_md.feature4encode5=allEncode[19:16];
-        ig_md.feature4encode6=allEncode[23:20];
     }
     action SetCode5(bit<32> allEncode) {
         ig_md.feature5encode1=allEncode[3:0];
         ig_md.feature5encode2=allEncode[7:4];
         ig_md.feature5encode3=allEncode[11:8];
         ig_md.feature5encode4=allEncode[15:12];
-        ig_md.feature5encode5=allEncode[19:16];
-        ig_md.feature5encode6=allEncode[23:20];
     }
     action SetCode6(bit<32> allEncode) {
         ig_md.feature6encode1=allEncode[3:0];
         ig_md.feature6encode2=allEncode[7:4];
         ig_md.feature6encode3=allEncode[11:8];
         ig_md.feature6encode4=allEncode[15:12];
-        ig_md.feature6encode5=allEncode[19:16];
-        ig_md.feature6encode6=allEncode[23:20];
     }
 
     action setTreeRes1(bit<8> res)
@@ -615,14 +604,6 @@ control SwitchIngress(
     action setTreeRes4(bit<8> res)
     {
         ig_md.resTree4=res;
-    }
-    action setTreeRes5(bit<8> res)
-    {
-        ig_md.resTree5=res;
-    }
-    action setTreeRes6(bit<8> res)
-    {
-        ig_md.resTree6=res;
     }
     action set_final_res()
     {
@@ -685,8 +666,6 @@ control SwitchIngress(
             ig_md.resTree2:exact;
             ig_md.resTree3:exact;
             ig_md.resTree4:exact;
-            ig_md.resTree5:exact;
-            ig_md.resTree6:exact;
         }
 
         actions ={
@@ -760,60 +739,7 @@ control SwitchIngress(
         size=4096;
     }
 
-    table dt_5_tb{
-        key={
-            ig_md.feature0encode5: ternary;
-            ig_md.feature1encode5 : ternary;
-            ig_md.feature2encode5 : ternary;
-            ig_md.feature3encode5 : ternary;
-            ig_md.feature4encode5 : ternary;
-            ig_md.feature5encode5 : ternary;
-            ig_md.feature6encode5 : ternary;
-        }
-        actions = {
-            setTreeRes5;
-        }
-        size=4096;
-    }
 
-    table dt_6_tb{
-        key={
-            ig_md.feature0encode6: ternary;
-            ig_md.feature1encode6 : ternary;
-            ig_md.feature2encode6 : ternary;
-            ig_md.feature3encode6 : ternary;
-            ig_md.feature4encode6 : ternary;
-            ig_md.feature5encode6 : ternary;
-            ig_md.feature6encode6 : ternary;
-        }
-        actions = {
-            setTreeRes6;
-        }
-        size=4096;
-    }
-
-    action drop() {
-        ig_intr_dprsr_md.drop_ctl = 1;
-    }
-
-    action forward(PortId_t port) {
-        ig_intr_tm_md.ucast_egress_port = port;
-    }
-
-    table simple_forward {
-        key = {
-            ig_intr_md.ingress_port: exact;
-        }
-        actions = {
-            drop;
-            forward;
-        }
-        default_action = drop();
-        const entries = {
-            152 : forward(154);
-            154 : forward(152);
-        }
-    }
 
 
 
@@ -829,6 +755,11 @@ control SwitchIngress(
             ig_md.classifiedFlowFlag = 0;
             ig_md.tmp_etherType=hdr.ethernet.etherType;
             // calculate iat
+            if(hdr.ethernet.etherType != TYPE_RECIRC){
+                hdr.timestamp.marking = 0x7E;
+                hdr.timestamp.ingress_timestamp = ig_intr_prsr_md.global_tstamp;
+                hdr.timestamp.setValid();
+            }
             //if (hdr.tcp.isValid() || hdr.udp.isValid()){ 
                 checkNewFlow_tb.apply();
                 if(ig_md.classifiedFlowFlag == 0){
@@ -839,7 +770,11 @@ control SwitchIngress(
                         }else{
                             ig_md.state = update_oldflow_ID.execute(ig_md.register_index);
                         }
-                        if(ig_md.state == 0){
+                        if(ig_md.state == 1) {
+                            hdr.ipv4.ttl = 255; // we set ttl = 255 to track hash collisions downstream
+                            ipv4_forward(7);
+                        }
+                        else if(ig_md.state == 0){
                             ig_md.is_first = 1;
                             ig_md.time_last_pkt = read_time_last_pkt.execute(ig_md.register_index);
                             //get_iat_value();
@@ -848,6 +783,10 @@ control SwitchIngress(
                             ig_md.pkt_len_min = read_pkt_len_min.execute(ig_md.register_index);
                             ig_md.pkt_len_total = read_pkt_len_total.execute(ig_md.register_index);
                             init_flow_iat_min.execute(ig_md.register_index);
+                            //update_payload1.execute(ig_md.register_index);
+                            hdr.ipv4.ttl = 127; // we set ttl = 127 to track these packets downstream
+                            ipv4_forward(7);
+                            hdr.timestamp.flow_type = 0x01;
                         }
                         else if(ig_md.state == 2){
                             ig_md.time_last_pkt = read_time_last_pkt.execute(ig_md.register_index);
@@ -875,23 +814,28 @@ control SwitchIngress(
                                 dt_2_tb.apply();
                                 dt_3_tb.apply();
                                 dt_4_tb.apply();
-                                dt_5_tb.apply();
-                                dt_6_tb.apply();
+
                                 // decide final class and recirculate
                                 merge_tb.apply();
+                                hdr.timestamp.flow_type = 0x02;
                                 //set_final_res();
+                            }else{
+                                hdr.ipv4.ttl = 127; // we set ttl = 127 to track these packets downstream
+                                ipv4_forward(7);
+                                hdr.timestamp.flow_type = 0x01;
                             }
                         }                 
                     }else{
                         ig_md.classified_flag = update_classified_flag.execute(ig_md.register_index);
                         hdr.ethernet.etherType = hdr.recirc.etherType;
                         hdr.recirc.setInvalid();
+                        hdr.ipv4.ttl = ig_md.classified_flag;
+                        ipv4_forward(5);
                     }
+                }else{
+                    hdr.ipv4.ttl = (bit<8>)ig_md.classifiedFlowFlag;
+                    ipv4_forward(5);
                 }
-                if(ig_intr_dprsr_md.digest_type != 1){
-                    simple_forward.apply();
-                }
-
             //}
         }
 }
@@ -907,7 +851,7 @@ control SwitchIngressDeparser(
     apply {      
         if(ig_intr_dprsr_md.digest_type == 1){
             //digest_a.pack({ig_md.flow_ID,ig_md.finres});
-            digest_a.pack({hdr.ipv4.src_addr, hdr.ipv4.dst_addr, ig_md.hdr_srcport, ig_md.hdr_dstport, hdr.ipv4.protocol,ig_md.finres});
+            digest_a.pack({hdr.ipv4.src_addr, hdr.ipv4.dst_addr, ig_md.hdr_srcport, ig_md.hdr_dstport, hdr.ipv4.protocol,ig_md.finres,ig_md.flow_iat_max,ig_md.flow_iat_min,ig_md.flow_duration,ig_md.pkt_len_max,ig_md.pkt_len_min,ig_md.pkt_len_total});
         }
         pkt.emit(hdr.ethernet);
         pkt.emit(hdr.recirc);
@@ -915,6 +859,7 @@ control SwitchIngressDeparser(
         pkt.emit(hdr.ipv4);
         pkt.emit(hdr.tcp);
         pkt.emit(hdr.udp);
+        pkt.emit(hdr.timestamp);
     }
 }
 
@@ -931,6 +876,7 @@ parser SwitchEgressParser(
      state parse_ethernet {
         pkt.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
+            TYPE_RECIRC : parse_recirc;
             TYPE_IPV4:  parse_ipv4;
             ETHERTYPE_VLAN: parse_vlan;
             default: parse_timestamp;
@@ -941,6 +887,15 @@ parser SwitchEgressParser(
         pkt.extract(hdr.vlan_tag);
         transition select(hdr.vlan_tag.ether_type) {
             ETHERTYPE_IPV4: parse_ipv4;
+            default: parse_timestamp;
+        }
+    }
+
+    state parse_recirc {
+       pkt.extract(hdr.recirc);
+       transition select(hdr.recirc.etherType) {
+            ETHERTYPE_IPV4: parse_ipv4;
+            ETHERTYPE_VLAN: parse_vlan;
             default: parse_timestamp;
         }
     }
@@ -965,6 +920,7 @@ parser SwitchEgressParser(
     }
 
     state parse_timestamp{
+        pkt.extract(hdr.timestamp);
         transition accept;
     }
 }
@@ -978,6 +934,7 @@ control SwitchEgress(
         inout egress_intrinsic_metadata_for_deparser_t eg_intr_dprs_md,
         inout egress_intrinsic_metadata_for_output_port_t eg_intr_oport_md) {
     apply {
+        hdr.timestamp.egress_timestamp = eg_intr_md_from_prsr.global_tstamp;
     }
 }
 
@@ -989,9 +946,11 @@ control SwitchEgressDeparser(
     apply {
         pkt.emit(hdr.ethernet);
         pkt.emit(hdr.vlan_tag);
+        pkt.emit(hdr.recirc);
         pkt.emit(hdr.ipv4);
         pkt.emit(hdr.tcp);
         pkt.emit(hdr.udp);
+        pkt.emit(hdr.timestamp);
     }
 }
 

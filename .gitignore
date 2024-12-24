@@ -4,7 +4,9 @@
 **.pcap
 **.csv
 BoostFlow/
+BoostFlow*/
 CMakeFiles/
 **.txt
 Makefile
 **.cmake
+encode/tableEntries/
