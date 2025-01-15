@@ -7,7 +7,7 @@ import re
 import signal
 import threading
 import time
-#import dbClient as dbc
+import dbClient as dbc
 import ipaddress
 
 def reset():
@@ -212,9 +212,9 @@ def addTableEntryToFlowFilter(data_dict):
 def readRegister(regLists:list):
     target = gc.Target(device_id=0, pipe_id=0xffff)
     regDict = {}
+    startTime = time.time()
+    print(f"start read time: {startTime} ")
     for regName in regLists:
-        startTime = time.time()
-        print(f"start read time: {startTime} ")
         regTable = bfrt_info.table_get("SwitchIngress."+regName)
         regDict[regName] = {}
         # for i in range(65536):
@@ -226,9 +226,9 @@ def readRegister(regLists:list):
         for data, key in resp:
             regDict[regName][i] = data.to_dict()["SwitchIngress."+regName+'.f1']
             i = i+1
-        endTime = time.time()
-        print(f"end read time: {endTime} ")
-        print(f"read time: {endTime-startTime} ")
+    endTime = time.time()
+    print(f"end read time: {endTime} ")
+    print(f"read time: {endTime-startTime} ")
     return regDict
        
    
@@ -237,7 +237,9 @@ def receive_digest():
     print("receive_digest......")
     signal.signal(signal.SIGINT, quit)                                
     signal.signal(signal.SIGTERM, quit)
-
+    regCountTable = bfrt_info.table_get("SwitchIngress.reg_pkt_count")
+    regFlowIDTable = bfrt_info.table_get("SwitchIngress.reg_flow_ID")
+    target = gc.Target(device_id=0, pipe_id=0xffff)
     while True:
         digest = None
         try:
@@ -264,18 +266,23 @@ def receive_digest():
                     #db.setFeature(data_dict)
                 except Exception as e:
                     print('Unexpected error adding table entry - [%s]', e)    
-
+        while outdate_index:
+            del_index = outdate_index.pop(0)
+            print(f"del index: {del_index}")
+            regCountTable.entry_add(target,[regCountTable.make_key([gc.KeyTuple('$REGISTER_INDEX', del_index)])],[regCountTable.make_data([gc.DataTuple('f1',0)])])
+            regFlowIDTable.entry_add(target,[regFlowIDTable.make_key([gc.KeyTuple('$REGISTER_INDEX', del_index)])],[regFlowIDTable.make_data([gc.DataTuple('f1',0)])])
+            
+            
+            
 def delOldFlowTableEntry(countRegSnapShot,flowIDRegSnapShot):
     print("tick....")
     regDict = readRegister(['reg_pkt_count','reg_flow_ID'])
     size = len(regDict['reg_pkt_count'])
-    for i in range(size):
-        if regDict['reg_pkt_count'][i] == countRegSnapShot[i] and regDict['reg_flow_ID'][i] == flowIDRegSnapShot[i]:
-            regCountTable = bfrt_info.table_get("SwitchIngress.reg_pkt_count")
-            regFlowIDTable = bfrt_info.table_get("SwitchIngress.reg_flow_ID")
-            target = gc.Target(device_id=0, pipe_id=0xffff)
-            regCountTable.entry_add(target,[regCountTable.make_key([gc.KeyTuple('$REGISTER_INDEX', i)])],[regCountTable.make_data([gc.DataTuple('f1',0)])])
-            regFlowIDTable.entry_add(target,[regFlowIDTable.make_key([gc.KeyTuple('$REGISTER_INDEX', i)])],[regFlowIDTable.make_data([gc.DataTuple('f1',0)])])
+    for i in range(1,size):
+        if regDict['reg_pkt_count'][i][0] == countRegSnapShot[i][0] and regDict['reg_pkt_count'][i][0] < 4 and regDict['reg_flow_ID'][i][0] == flowIDRegSnapShot[i][0] and regDict['reg_flow_ID'][i][0] != 0:
+            outdate_index.append(i)
+        elif regDict['reg_pkt_count'][i][1] == countRegSnapShot[i][1] and regDict['reg_pkt_count'][i][1] < 4 and regDict['reg_flow_ID'][i][1] == flowIDRegSnapShot[i][1] and regDict['reg_flow_ID'][i][1] != 0:
+            outdate_index.append(i)
     countRegSnapShot = regDict['reg_pkt_count']
     flowIDRegSnapShot = regDict['reg_flow_ID']        
     threading.Timer(30, delOldFlowTableEntry, [countRegSnapShot,flowIDRegSnapShot]).start()
@@ -285,21 +292,29 @@ def test():
     regFlowIDTable = bfrt_info.table_get("SwitchIngress.reg_flow_ID")
     target = gc.Target(device_id=0, pipe_id=0xffff)
     regCountTable.entry_add(target,[regCountTable.make_key([gc.KeyTuple('$REGISTER_INDEX', 1)])],[regCountTable.make_data([gc.DataTuple('f1',10)])])
-    regFlowIDTable.entry_add(target,[regFlowIDTable.make_key([gc.KeyTuple('$REGISTER_INDEX', 1)])],[regFlowIDTable.make_data([gc.DataTuple('f1',10)])])
+    regFlowIDTable.entry_add(target,[regFlowIDTable.make_key([gc.KeyTuple('$REGISTER_INDEX', 1)])],[regFlowIDTable.make_data([gc.DataTuple('f1',100000000)])])
 
 if __name__ == '__main__':
-    curP4Name = 'p4_flowManagement_2'
+    curP4Name = 'BoostFlow_resubmit'
     switchIP = "172.23.20.70"
     port = "50052"
     grpc_client=gc.ClientInterface(grpc_addr=switchIP+":"+port,client_id=0,device_id=0)
     bfrt_info=grpc_client.bfrt_info_get(p4_name=None)
     grpc_client.bind_pipeline_config(p4_name=bfrt_info.p4_name)
+    
+    url = "http://218.199.84.19:8088"
+    token = "B1gnlW_Qhet5JNdijU1N3cGmxDlCzNQNKZkhKPIyqajXV5QBWOP8LkPWARc-20V0VR-yK6rtlwcQC064O7Pofw=="  # 对于InfluxDB 1.8，token通常是 username:password
+    org = "my-org"  # 对于InfluxDB 1.8，组织可以使用任意值，但通常使用 "-"
+    bucket = "classdb"
+    db = dbc.dbClient(url,token,org,bucket)
+    outdate_index = []
+    
     learn_filter = bfrt_info.learn_get("digest_a")
     countRegSnapShot = {}
     flowIDRegSnapShot = {}
     for i in range(65536):
-        countRegSnapShot[i] = 0
-        flowIDRegSnapShot[i] = 0
+        countRegSnapShot[i] = [0,0]
+        flowIDRegSnapShot[i] = [0,0]
     if len(sys.argv) != 2:
         print('error')
     elif sys.argv[1] == 'add':
@@ -317,9 +332,11 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'reset':
         print('reset')
         reset()
+        exit()
     elif sys.argv[1] == 'test':
         print('test')
         test()
+        exit()
     else : 
         print('error')
     #接受digest数据包

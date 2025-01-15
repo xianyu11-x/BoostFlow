@@ -1,0 +1,3 @@
+import fifo
+
+fifo.reader()

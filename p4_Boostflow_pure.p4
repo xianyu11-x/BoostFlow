@@ -100,6 +100,12 @@ struct digest_a_t{
     bit<16> dst_port;
     bit<8> protocol;
     bit<8> final_res;
+    bit<32> flow_iat_max;
+    bit<32> flow_iat_min;
+    bit<32> flow_duration;
+    bit<16> pkt_len_max;
+    bit<16> pkt_len_min;
+    bit<16> pkt_len_total;
 } 
 
 
@@ -172,20 +178,6 @@ struct ig_metadata_t {
     bit<4> feature6encode2;
     bit<4> feature6encode3;
     bit<4> feature6encode4;
-    bit<4> feature0encode5;
-    bit<4> feature0encode6;
-    bit<4> feature1encode5;
-    bit<4> feature1encode6;
-    bit<4> feature2encode5;
-    bit<4> feature2encode6;
-    bit<4> feature3encode5;
-    bit<4> feature3encode6;
-    bit<4> feature4encode5;
-    bit<4> feature4encode6;
-    bit<4> feature5encode5;
-    bit<4> feature5encode6;
-    bit<4> feature6encode5;
-    bit<4> feature6encode6;
     bit<8> resTree1;
     bit<8> resTree2;
     bit<8> resTree3;
@@ -543,61 +535,47 @@ control SwitchIngress(
     //#define tb_apply(name) name##_tb.apply();
 
 
-    action SetCode0(bit<32> allEncode) {
+    action SetCode0(bit<16> allEncode) {
         ig_md.feature0encode1=allEncode[3:0];
         ig_md.feature0encode2=allEncode[7:4];
         ig_md.feature0encode3=allEncode[11:8];
         ig_md.feature0encode4=allEncode[15:12];
-        ig_md.feature0encode5=allEncode[19:16];
-        ig_md.feature0encode6=allEncode[23:20];
     }
-    action SetCode1(bit<32> allEncode) {
+    action SetCode1(bit<16> allEncode) {
         ig_md.feature1encode1=allEncode[3:0];
         ig_md.feature1encode2=allEncode[7:4];
         ig_md.feature1encode3=allEncode[11:8];
         ig_md.feature1encode4=allEncode[15:12];
-        ig_md.feature1encode5=allEncode[19:16];
-        ig_md.feature1encode6=allEncode[23:20];
     }
-    action SetCode2(bit<32> allEncode) {
+    action SetCode2(bit<16> allEncode) {
         ig_md.feature2encode1=allEncode[3:0];
         ig_md.feature2encode2=allEncode[7:4];
         ig_md.feature2encode3=allEncode[11:8];
         ig_md.feature2encode4=allEncode[15:12];
-        ig_md.feature2encode5=allEncode[19:16];
-        ig_md.feature2encode6=allEncode[23:20];
     }
-    action SetCode3(bit<32> allEncode) {
+    action SetCode3(bit<16> allEncode) {
         ig_md.feature3encode1=allEncode[3:0];
         ig_md.feature3encode2=allEncode[7:4];
         ig_md.feature3encode3=allEncode[11:8];
         ig_md.feature3encode4=allEncode[15:12];
-        ig_md.feature3encode5=allEncode[19:16];
-        ig_md.feature3encode6=allEncode[23:20];
     }
-    action SetCode4(bit<32> allEncode) {
+    action SetCode4(bit<16> allEncode) {
         ig_md.feature4encode1=allEncode[3:0];
         ig_md.feature4encode2=allEncode[7:4];
         ig_md.feature4encode3=allEncode[11:8];
         ig_md.feature4encode4=allEncode[15:12];
-        ig_md.feature4encode5=allEncode[19:16];
-        ig_md.feature4encode6=allEncode[23:20];
     }
-    action SetCode5(bit<32> allEncode) {
+    action SetCode5(bit<16> allEncode) {
         ig_md.feature5encode1=allEncode[3:0];
         ig_md.feature5encode2=allEncode[7:4];
         ig_md.feature5encode3=allEncode[11:8];
         ig_md.feature5encode4=allEncode[15:12];
-        ig_md.feature5encode5=allEncode[19:16];
-        ig_md.feature5encode6=allEncode[23:20];
     }
-    action SetCode6(bit<32> allEncode) {
+    action SetCode6(bit<16> allEncode) {
         ig_md.feature6encode1=allEncode[3:0];
         ig_md.feature6encode2=allEncode[7:4];
         ig_md.feature6encode3=allEncode[11:8];
         ig_md.feature6encode4=allEncode[15:12];
-        ig_md.feature6encode5=allEncode[19:16];
-        ig_md.feature6encode6=allEncode[23:20];
     }
 
     action setTreeRes1(bit<8> res)
@@ -685,8 +663,6 @@ control SwitchIngress(
             ig_md.resTree2:exact;
             ig_md.resTree3:exact;
             ig_md.resTree4:exact;
-            ig_md.resTree5:exact;
-            ig_md.resTree6:exact;
         }
 
         actions ={
@@ -756,38 +732,6 @@ control SwitchIngress(
         }
         actions = {
             setTreeRes4;
-        }
-        size=4096;
-    }
-
-    table dt_5_tb{
-        key={
-            ig_md.feature0encode5: ternary;
-            ig_md.feature1encode5 : ternary;
-            ig_md.feature2encode5 : ternary;
-            ig_md.feature3encode5 : ternary;
-            ig_md.feature4encode5 : ternary;
-            ig_md.feature5encode5 : ternary;
-            ig_md.feature6encode5 : ternary;
-        }
-        actions = {
-            setTreeRes5;
-        }
-        size=4096;
-    }
-
-    table dt_6_tb{
-        key={
-            ig_md.feature0encode6: ternary;
-            ig_md.feature1encode6 : ternary;
-            ig_md.feature2encode6 : ternary;
-            ig_md.feature3encode6 : ternary;
-            ig_md.feature4encode6 : ternary;
-            ig_md.feature5encode6 : ternary;
-            ig_md.feature6encode6 : ternary;
-        }
-        actions = {
-            setTreeRes6;
         }
         size=4096;
     }
@@ -875,8 +819,6 @@ control SwitchIngress(
                                 dt_2_tb.apply();
                                 dt_3_tb.apply();
                                 dt_4_tb.apply();
-                                dt_5_tb.apply();
-                                dt_6_tb.apply();
                                 // decide final class and recirculate
                                 merge_tb.apply();
                                 //set_final_res();
@@ -907,7 +849,7 @@ control SwitchIngressDeparser(
     apply {      
         if(ig_intr_dprsr_md.digest_type == 1){
             //digest_a.pack({ig_md.flow_ID,ig_md.finres});
-            digest_a.pack({hdr.ipv4.src_addr, hdr.ipv4.dst_addr, ig_md.hdr_srcport, ig_md.hdr_dstport, hdr.ipv4.protocol,ig_md.finres});
+             digest_a.pack({hdr.ipv4.src_addr, hdr.ipv4.dst_addr, ig_md.hdr_srcport, ig_md.hdr_dstport, hdr.ipv4.protocol,ig_md.finres,ig_md.flow_iat_max,ig_md.flow_iat_min,ig_md.flow_duration,ig_md.pkt_len_max,ig_md.pkt_len_min,ig_md.pkt_len_total});
         }
         pkt.emit(hdr.ethernet);
         pkt.emit(hdr.recirc);

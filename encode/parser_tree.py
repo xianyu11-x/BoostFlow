@@ -1,8 +1,8 @@
 import re
 import copy
 import numpy as np
-#import encode.utils as utils
-import utils
+import encode.utils as utils
+#import utils
 import json
 
 def parse_tree(lines):
@@ -387,7 +387,7 @@ def get_para(lines,feature_list,maxBitsList):
     trees = parse_tree(lines)
     global leafValueDict
     leafValueDict = sortTreesLeaf(trees)
-    print(leafValueDict)
+    #print(leafValueDict)
     feature_dict=split_all_feature(trees,feature_list)
     tree_feature_dict=split_tree_feature(trees,feature_list)
     encode_feature_dict=encode_feature(feature_dict,tree_feature_dict)

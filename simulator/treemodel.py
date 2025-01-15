@@ -2,9 +2,10 @@ import xgboost as xgb
 import pandas as pd
 
 class TreeModel:
-    def __init__(self, model_type, model_path):
+    def __init__(self, model_type, model_path,class_num=2):
         self.model_type = model_type
         self.model_path = model_path
+        self.class_num = class_num
         self.load_model(model_path)
         
     
@@ -23,7 +24,8 @@ class TreeModel:
             data_df = pd.DataFrame([data], columns=ListName)
             dtest = xgb.DMatrix(data_df)
             ypred = self.model.predict(dtest)
-            ypred = (ypred >= 0.5)*1+1
+            if self.class_num == 2:
+                ypred = (ypred >= 0.5)*1+1
             return ypred
         else:
             return None
