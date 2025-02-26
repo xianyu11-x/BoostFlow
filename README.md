@@ -21,13 +21,21 @@ BoostFlow.p4 数据平面代码
    2. 交换机
       1. `p4_build-9.x.y.sh <路径>`
 2. 运行数据面代码
-   1. `run_switchd -p <名字/文件名> //启动交换机`
-   2. `run_bfshell.sh -f port_up.txt //配置端口`
+   1. 模拟器
+      1. `run_tofino_model -p <名字/文件名> //启动模拟asic`
+      2. `run_switchd -p <名字/文件名> //启动交换机`
+   2. 交换机
+      1. `run_switchd -p <名字/文件名> //启动交换机`
+      2. `run_bfshell.sh -f port_up.txt //配置端口`
 3. 控制面代码
    1. `python controller.py <参数>`
       1. add 加载流表(会直接从模型表示文件生成流表)
       2. del 清空流表
       3. reset 清空数据
+4. 重放流量
+   1. `tcpreplay -i <端口> <pcap文件>`
+5. 收集流量
+   1. `tcpdump -i <端口> -w <输出文件>`
 
 ## 模型编码
 
